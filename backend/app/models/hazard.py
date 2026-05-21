@@ -89,5 +89,9 @@ class Hazard(Base):
     # 状态
     status = Column(Enum(HazardStatus), default=HazardStatus.PENDING, nullable=False, index=True)
 
+    # v1.1：外部系统来源（集成自 equipment-inspection 等）
+    external_source = Column(String(50), nullable=True, index=True, comment="来源系统标识，如 equipment-inspection")
+    external_no = Column(String(50), nullable=True, index=True, comment="对方系统的单号，幂等用")
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

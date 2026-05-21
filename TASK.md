@@ -23,10 +23,19 @@
 - [x] CLAUDE.md
 - [x] TASK.md
 
+## v1.1（已完成，2026-05-21）
+
+### 后端
+- [x] `POST /api/integration/hazards`：接收 equipment-inspection 推送的 CRITICAL 缺陷，自动建隐患单（X-Integration-Secret 头校验，幂等基于 external_source + external_no）
+- [x] `GET /api/integration/hazards/by-external/{source}/{external_no}`：反查隐患状态
+- [x] Hazard 模型增加 `external_source` + `external_no` 字段
+- [x] CRITICAL 缺陷→MAJOR 隐患（14 天整改）；非 CRITICAL→GENERAL（30 天）
+- [x] 设备编号前缀自动映射 area：BL→BOILER、TB→TURBINE、GN/EL→ELECTRICAL、CH→CHEMICAL、AS→ASH_HANDLING、DS→DESULFURIZATION
+
 ## v2.0（规划）
 
 ### 后端
-- [ ] 两票管理：工作票 / 操作票 模型
+- [ ] 两票管理：工作票 / 操作票 模型（注：已在 equipment-inspection 实现，本系统未来可读取/反向同步）
 - [ ] 多级审批流（draft → submitted → approved → in_execution → closed）
 - [ ] 监护人签字时间戳
 - [ ] 安全检查模块（计划 + 执行 + 检查项检查结果 + 自动生成隐患）
@@ -34,7 +43,7 @@
 - [ ] 角色权限拦截装饰器（按 UserRole 校验）
 
 ### 前端
-- [ ] 两票管理页面
+- [ ] 隐患列表显示来源（external_source 标记）
 - [ ] 安全检查页面
 - [ ] 隐患详情新增整改历史时间线
 - [ ] 实时通知 toast

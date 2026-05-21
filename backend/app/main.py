@@ -9,7 +9,7 @@ from app.config import settings
 from app.database import engine, SessionLocal, Base
 from app.models.user import User, UserRole
 from app.models.hazard import Hazard
-from app.api import auth, hazards, dashboard
+from app.api import auth, hazards, dashboard, integration
 from app.api.deps import hash_password
 
 # 确保所有模型在建表前已被导入
@@ -68,6 +68,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(hazards.router)
 app.include_router(dashboard.router)
+app.include_router(integration.router)
 
 
 @app.get("/health", tags=["系统"])
