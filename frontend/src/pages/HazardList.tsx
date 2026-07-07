@@ -7,7 +7,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, ReloadOutlined, EyeOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { hazardApi } from '../api'
-import type { Hazard, HazardArea, HazardCategory, HazardLevel, HazardStatus } from '../types'
+import type { Hazard, HazardArea, HazardLevel, HazardStatus } from '../types'
 
 const AREA_OPTIONS = [
   ['MAIN_PLANT', '主厂房'], ['BOILER', '锅炉区'], ['TURBINE', '汽轮机区'],
@@ -153,7 +153,7 @@ export default function HazardList() {
           <Col flex="auto">
             <Space wrap>
               <Input
-                placeholder="标题/描述关键字"
+                placeholder="标题/描述关键词"
                 style={{ width: 200 }}
                 allowClear
                 onChange={(e) => setFilters((f) => ({ ...f, keyword: e.target.value || undefined }))}
@@ -299,7 +299,7 @@ export default function HazardList() {
             )}
             {detail.verified_at && (
               <Descriptions.Item label="复查" span={2}>
-                {detail.verifier} 于 {dayjs(detail.verified_at).format('YYYY-MM-DD HH:mm')}：{detail.verification_notes}
+                {detail.verifier} 于{dayjs(detail.verified_at).format('YYYY-MM-DD HH:mm')}：{detail.verification_notes}
               </Descriptions.Item>
             )}
           </Descriptions>

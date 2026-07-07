@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
     APP_NAME: str = "发电厂安全生产管理系统"
-    APP_VERSION: str = "1.1.0"
+    APP_VERSION: str = "2.0.0"
     DEBUG: bool = False
     ALLOWED_ORIGINS: Optional[List[str]] = None
 

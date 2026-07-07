@@ -1,6 +1,6 @@
-"""依赖注入：DB 会话 + JWT 鉴权"""
+"""依赖注入：DB 会话 + JWT 鉴权 + 角色权限拦截"""
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Callable, Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import SessionLocal
-from app.models.user import User
+from app.models.user import User, UserRole
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -56,3 +56,44 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     if not user or not user.is_active:
         raise credentials_exception
     return user
+
+
+ROLE_LEVEL = {
+    UserRole.VIEWER: 1,
+    UserRole.OPERATOR: 2,
+    UserRole.SAFETY_OFFICER: 3,
+    UserRole.ADMIN: 4,
+}
+
+
+def require_roles(*roles: UserRole) -> Callable[..., User]:
+    """权限拦截工厂：要求当前用户角色在 roles 内。
+
+    用法：`current: User = Depends(require_roles(UserRole.SAFETY_OFFICER, UserRole.ADMIN))`
+    """
+    allowed = set(roles)
+
+    def _checker(current: User = Depends(get_current_user)) -> User:
+        if current.role not in allowed:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"需要角色：{','.join(r.value for r in allowed)}",
+            )
+        return current
+
+    return _checker
+
+
+def require_min_role(min_role: UserRole) -> Callable[..., User]:
+    """权限拦截工厂：要求当前用户角色 >= min_role（按 ROLE_LEVEL 等级排序）。"""
+    threshold = ROLE_LEVEL[min_role]
+
+    def _checker(current: User = Depends(get_current_user)) -> User:
+        if ROLE_LEVEL.get(current.role, 0) < threshold:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"需要至少 {min_role.value} 角色",
+            )
+        return current
+
+    return _checker

@@ -2,11 +2,12 @@
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, get_current_user
+from app.api.deps import get_db, get_current_user, require_min_role
+from app.api.ws import push
 from app.models.hazard import (
     Hazard,
     HazardArea,
@@ -14,7 +15,7 @@ from app.models.hazard import (
     HazardLevel,
     HazardStatus,
 )
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.hazard import (
     HazardCreate,
     HazardUpdate,
@@ -66,8 +67,9 @@ def list_hazards(
 @router.post("")
 def create_hazard(
     payload: HazardCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_min_role(UserRole.OPERATOR)),
 ):
     next_seq = (db.query(func.count(Hazard.id)).scalar() or 0) + 1
     hazard = Hazard(
@@ -89,6 +91,13 @@ def create_hazard(
     db.add(hazard)
     db.commit()
     db.refresh(hazard)
+    background_tasks.add_task(
+        push,
+        "hazard.created",
+        "新增隐患",
+        f"{hazard.hazard_code} {hazard.title}",
+        {"id": hazard.id, "level": hazard.level.value, "area": hazard.area.value},
+    )
     return api_response(message="隐患已登记", data=HazardResponse.model_validate(hazard).model_dump())
 
 
@@ -105,7 +114,7 @@ def update_hazard(
     hazard_id: int,
     payload: HazardUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_min_role(UserRole.OPERATOR)),
 ):
     h = db.query(Hazard).filter(Hazard.id == hazard_id).first()
     if not h:
@@ -125,8 +134,9 @@ def update_hazard(
 def rectify_hazard(
     hazard_id: int,
     payload: HazardRectify,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_min_role(UserRole.OPERATOR)),
 ):
     """提交整改完成（待复查）"""
     h = db.query(Hazard).filter(Hazard.id == hazard_id).first()
@@ -139,6 +149,13 @@ def rectify_hazard(
     h.status = HazardStatus.RECTIFIED
     db.commit()
     db.refresh(h)
+    background_tasks.add_task(
+        push,
+        "hazard.rectified",
+        "隐患待复查",
+        f"{h.hazard_code} {h.title} 整改完成，待复查",
+        {"id": h.id},
+    )
     return api_response(message="整改已提交，等待复查", data=HazardResponse.model_validate(h).model_dump())
 
 
@@ -146,8 +163,9 @@ def rectify_hazard(
 def verify_hazard(
     hazard_id: int,
     payload: HazardVerify,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_min_role(UserRole.SAFETY_OFFICER)),
 ):
     """复查：通过则关闭，未通过则退回整改中"""
     h = db.query(Hazard).filter(Hazard.id == hazard_id).first()
@@ -163,6 +181,13 @@ def verify_hazard(
         h.rectified_at = None
     db.commit()
     db.refresh(h)
+    background_tasks.add_task(
+        push,
+        "hazard.verified" if payload.passed else "hazard.rejected",
+        "隐患复查通过" if payload.passed else "复查退回",
+        f"{h.hazard_code} {h.title}",
+        {"id": h.id, "passed": payload.passed},
+    )
     return api_response(
         message="复查通过，隐患已关闭" if payload.passed else "复查未通过，退回整改",
         data=HazardResponse.model_validate(h).model_dump(),

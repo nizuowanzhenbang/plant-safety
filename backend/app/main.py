@@ -9,11 +9,16 @@ from app.config import settings
 from app.database import engine, SessionLocal, Base
 from app.models.user import User, UserRole
 from app.models.hazard import Hazard
-from app.api import auth, hazards, dashboard, integration
+from app.models.ticket import WorkTicket, OperationTicket
+from app.models.safety_check import SafetyCheckPlan, SafetyCheckRecord
+from app.api import (
+    auth, hazards, dashboard, integration,
+    work_tickets, operation_tickets, safety_checks, ws,
+)
 from app.api.deps import hash_password
 
 # 确保所有模型在建表前已被导入
-_ = (User, Hazard)
+_ = (User, Hazard, WorkTicket, OperationTicket, SafetyCheckPlan, SafetyCheckRecord)
 
 
 def _create_default_admin(db) -> None:
@@ -48,7 +53,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    description="发电厂安全生产管理系统 - 隐患排查与整改闭环",
+    description="发电厂安全生产管理系统 - 隐患排查 + 两票管理 + 安全检查 + 实时推送",
     lifespan=lifespan,
 )
 
@@ -69,6 +74,10 @@ app.include_router(auth.router)
 app.include_router(hazards.router)
 app.include_router(dashboard.router)
 app.include_router(integration.router)
+app.include_router(work_tickets.router)
+app.include_router(operation_tickets.router)
+app.include_router(safety_checks.router)
+app.include_router(ws.router)
 
 
 @app.get("/health", tags=["系统"])
