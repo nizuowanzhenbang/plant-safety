@@ -55,12 +55,18 @@ class GenerateRecordsRequest(BaseModel):
 
 
 class CheckResultItem(BaseModel):
+    """检查结果输出，隐患编号由服务器转换成功后填写。"""
     seq: int
     content: str
     standard: Optional[str] = None
     conformant: bool
     notes: Optional[str] = None
     hazard_id: Optional[int] = None      # 已转隐患的 id
+
+
+class CheckResultInput(CheckResultItem):
+    """提交项不得指定隐患编号；兼容省略字段或显式 null。"""
+    hazard_id: None = None
 
 
 class StartCheckRequest(BaseModel):
@@ -70,7 +76,7 @@ class StartCheckRequest(BaseModel):
 class SubmitCheckRequest(BaseModel):
     """提交检查结果"""
     inspector: str
-    result_items: List[CheckResultItem]
+    result_items: List[CheckResultInput]
     summary: Optional[str] = None
 
 

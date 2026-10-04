@@ -5,7 +5,7 @@ import type {
   HazardLevel, HazardStatus,
   WorkTicket, WorkTicketStatus, WorkTicketType,
   OperationTicket, OperationTicketStatus,
-  SafetyCheckPlan, SafetyCheckRecord, CheckRecordStatus, CheckResultItem,
+  SafetyCheckPlan, SafetyCheckRecord, CheckRecordStatus, CheckResultInput,
   CheckItemTemplate, CheckFrequency, CheckPlanStatus,
 } from '../types'
 
@@ -127,7 +127,7 @@ export const safetyCheckApi = {
     api.post<unknown, ApiResponse<SafetyCheckRecord[]>>('/safety-checks/records/generate', { plan_id, scheduled_dates }),
   startRecord: (id: number, inspector: string) =>
     api.post<unknown, ApiResponse<SafetyCheckRecord>>(`/safety-checks/records/${id}/start`, { inspector }),
-  submitRecord: (id: number, inspector: string, result_items: CheckResultItem[], summary?: string) =>
+  submitRecord: (id: number, inspector: string, result_items: CheckResultInput[], summary?: string) =>
     api.post<unknown, ApiResponse<SafetyCheckRecord>>(`/safety-checks/records/${id}/submit`, { inspector, result_items, summary }),
   convertHazard: (record_id: number, seq: number, category: HazardCategory, level: HazardLevel, assignee?: string, assignee_dept?: string, deadline_days?: number) =>
     api.post<unknown, ApiResponse<{ hazard_id: number; hazard_code: string; record: SafetyCheckRecord }>>(

@@ -183,6 +183,9 @@ export interface CheckResultItem {
   hazard_id?: number | null
 }
 
+// 隐患编号由服务器转换成功后生成，提交仅接受省略或 null。
+export type CheckResultInput = Omit<CheckResultItem, 'hazard_id'> & { hazard_id?: null }
+
 export interface SafetyCheckRecord {
   id: number
   record_code: string
