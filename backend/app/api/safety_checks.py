@@ -24,6 +24,7 @@ from app.schemas.safety_check import (
 from app.utils.helpers import (
     api_response, paginate_response, generate_safety_check_code, generate_hazard_code,
 )
+from app.utils.hazard_deadlines import deadline_for, max_deadline_days
 
 router = APIRouter(prefix="/api/safety-checks", tags=["安全检查"])
 
@@ -301,7 +302,12 @@ def convert_to_hazard(
 
     plan = r.plan
     area_enum = HazardArea(plan.area) if plan else HazardArea.MAIN_PLANT
-    deadline_days = payload.deadline_days or (14 if payload.level == HazardLevel.MAJOR else 30)
+    maximum_days = max_deadline_days(payload.level)
+    deadline_days = maximum_days if payload.deadline_days is None else payload.deadline_days
+    if not 1 <= deadline_days <= maximum_days:
+        raise HTTPException(422, f"整改天数须为 1 至 {maximum_days} 天")
+    reported_at = datetime.utcnow()
+    deadline = deadline_for(payload.level, reported_at, reported_at + timedelta(days=deadline_days))
 
     seq = (db.query(func.count(Hazard.id)).scalar() or 0) + 1
     title = f"[安全检查] {target.get('content', '')[:160]}"
@@ -323,10 +329,10 @@ def convert_to_hazard(
         level=payload.level,
         reporter=r.inspector or current.username,
         department=plan.owner_dept if plan else None,
-        reported_at=datetime.utcnow(),
+        reported_at=reported_at,
         assignee=payload.assignee,
         assignee_dept=payload.assignee_dept,
-        deadline=datetime.utcnow() + timedelta(days=deadline_days),
+        deadline=deadline,
         external_source="safety-check",
         external_no=f"{r.record_code}-{payload.seq}",
         status=HazardStatus.IN_PROGRESS if payload.assignee else HazardStatus.PENDING,

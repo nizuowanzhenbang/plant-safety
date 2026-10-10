@@ -55,6 +55,8 @@ export default function HazardList() {
   const [rectifyOpen, setRectifyOpen] = useState(false)
   const [verifyOpen, setVerifyOpen] = useState(false)
   const [form] = Form.useForm()
+  const createLevel = Form.useWatch('level', form) as HazardLevel | undefined
+  const maxDeadlineDays = createLevel === 'MAJOR' ? 14 : 30
   const [rectifyForm] = Form.useForm()
   const [verifyForm] = Form.useForm()
 
@@ -234,8 +236,22 @@ export default function HazardList() {
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="deadline" label="整改期限">
-                <DatePicker style={{ width: '100%' }} />
+              <Form.Item
+                name="deadline" label="整改期限" dependencies={['level']}
+                extra={`不填写时按发现时间后 ${maxDeadlineDays} 天设置。`}
+                rules={[({ getFieldValue }) => ({
+                  validator(_, value: dayjs.Dayjs | undefined) {
+                    const days = getFieldValue('level') === 'MAJOR' ? 14 : 30
+                    return !value || !value.isAfter(dayjs().add(days, 'day'))
+                      ? Promise.resolve()
+                      : Promise.reject(new Error(`整改期限不得超过 ${days} 天`))
+                  },
+                })]}
+              >
+                <DatePicker
+                  style={{ width: '100%' }}
+                  disabledDate={(current) => current.isAfter(dayjs().add(maxDeadlineDays, 'day'), 'day')}
+                />
               </Form.Item>
             </Col>
           </Row>

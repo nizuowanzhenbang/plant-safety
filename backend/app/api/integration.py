@@ -1,5 +1,5 @@
 """跨系统集成接口：接收 equipment-inspection 推送的 CRITICAL 缺陷，落地为隐患单"""
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Header, HTTPException
@@ -13,6 +13,7 @@ from app.models.hazard import (
     Hazard, HazardArea, HazardCategory, HazardLevel, HazardStatus,
 )
 from app.utils.helpers import api_response, generate_hazard_code
+from app.utils.hazard_deadlines import deadline_for, normalize_utc
 from fastapi import Depends
 
 router = APIRouter(prefix="/api/integration", tags=["跨系统集成"])
@@ -94,9 +95,8 @@ def receive_hazard(
     code = generate_hazard_code(next_seq)
 
     level = _map_level(payload.severity)
-    # CRITICAL → MAJOR 隐患：14 天整改；一般 30 天
-    deadline_days = 14 if level == HazardLevel.MAJOR else 30
-    deadline = (payload.reported_at or datetime.utcnow()) + timedelta(days=deadline_days)
+    reported_at = normalize_utc(payload.reported_at or datetime.utcnow())
+    deadline = deadline_for(level, reported_at)
 
     desc_parts = [payload.description or payload.title]
     if payload.equipment_code:
@@ -113,7 +113,7 @@ def receive_hazard(
         level=level,
         reporter=payload.reported_by or "external-integration",
         department=payload.source_system,
-        reported_at=payload.reported_at or datetime.utcnow(),
+        reported_at=reported_at,
         deadline=deadline,
         status=HazardStatus.PENDING,
         external_source=payload.source_system,
