@@ -24,6 +24,7 @@ from app.schemas.hazard import (
     HazardResponse,
 )
 from app.utils.helpers import api_response, paginate_response, generate_hazard_code
+from app.utils.hazard_deadlines import deadline_for
 
 router = APIRouter(prefix="/api/hazards", tags=["隐患排查"])
 
@@ -71,6 +72,8 @@ def create_hazard(
     db: Session = Depends(get_db),
     _: User = Depends(require_min_role(UserRole.OPERATOR)),
 ):
+    reported_at = datetime.utcnow()
+    deadline = deadline_for(payload.level, reported_at, payload.deadline)
     next_seq = (db.query(func.count(Hazard.id)).scalar() or 0) + 1
     hazard = Hazard(
         hazard_code=generate_hazard_code(next_seq),
@@ -81,11 +84,11 @@ def create_hazard(
         level=payload.level,
         reporter=payload.reporter,
         department=payload.department,
-        reported_at=datetime.utcnow(),
+        reported_at=reported_at,
         photo_url=payload.photo_url,
         assignee=payload.assignee,
         assignee_dept=payload.assignee_dept,
-        deadline=payload.deadline,
+        deadline=deadline,
         status=HazardStatus.IN_PROGRESS if payload.assignee else HazardStatus.PENDING,
     )
     db.add(hazard)
@@ -121,7 +124,14 @@ def update_hazard(
         raise HTTPException(404, "隐患不存在")
     if h.status in (HazardStatus.VERIFIED,):
         raise HTTPException(400, "已关闭隐患不可修改")
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    changes = payload.model_dump(exclude_unset=True)
+    level = changes.get("level", h.level)
+    if level is None:
+        raise HTTPException(422, "隐患等级不能为空")
+    # 先算有效期限，再改模型；无关更新不批量修正旧记录。
+    if "deadline" in changes or level != h.level:
+        changes["deadline"] = deadline_for(level, h.reported_at, changes.get("deadline", h.deadline))
+    for field, value in changes.items():
         setattr(h, field, value)
     if payload.assignee and h.status == HazardStatus.PENDING:
         h.status = HazardStatus.IN_PROGRESS
