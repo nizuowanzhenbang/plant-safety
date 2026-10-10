@@ -214,6 +214,68 @@ def test_closed_record_cannot_be_changed(api):
     assert state(factory) == before
 
 
+@pytest.mark.parametrize("first,competing", [
+    ({"deadline": (NOW + timedelta(days=30)).isoformat()}, {"level": "MAJOR"}),
+    ({"level": "MAJOR"}, {"deadline": (NOW + timedelta(days=30)).isoformat()}),
+])
+def test_competing_level_and_deadline_update_rejects_stale_write(api, monkeypatch, first, competing):
+    client, factory, _ = api
+    row = create(client, deadline=(NOW + timedelta(days=7)).isoformat())
+    path = f"/api/hazards/{row['id']}"
+    original = hazards.deadline_for
+    after_competing = None
+
+    def interleave(*args, **kwargs):
+        nonlocal after_competing
+        deadline = original(*args, **kwargs)
+        if after_competing is None:
+            # 只调度真实请求的交错时机，不替换校验或数据库结果。
+            after_competing = {}
+            response = client.put(path, json=competing)
+            assert response.status_code == 200, response.text
+            after_competing = state(factory)
+        return deadline
+
+    monkeypatch.setattr(hazards, "deadline_for", interleave)
+    response = client.put(path, json={**first, "title": "过时请求不得部分写入"})
+    assert response.status_code == 409, response.text
+    assert state(factory) == after_competing
+    # 刷新后的请求重新按最新等级/期限校验，不能简单重试绕过上限。
+    assert client.put(path, json=first).status_code == 422
+    assert state(factory) == after_competing
+
+
+def test_update_cannot_overwrite_concurrent_closure(api, monkeypatch):
+    client, factory, headers = api
+    row = create(client)
+    path = f"/api/hazards/{row['id']}"
+    original = hazards.deadline_for
+    after_closure = None
+
+    def interleave(*args, **kwargs):
+        nonlocal after_closure
+        deadline = original(*args, **kwargs)
+        if after_closure is None:
+            after_closure = {}
+            response = client.post(path + "/rectify", json={"rectification_measure": "模拟整改完成"})
+            assert response.status_code == 200, response.text
+            response = client.post(path + "/verify", headers=headers["SAFETY_OFFICER"], json={
+                "verifier": "测试复查员", "verification_notes": "模拟复查通过", "passed": True,
+            })
+            assert response.status_code == 200, response.text
+            after_closure = state(factory)
+        return deadline
+
+    monkeypatch.setattr(hazards, "deadline_for", interleave)
+    response = client.put(path, json={
+        "title": "关闭后不得偷改", "deadline": (NOW + timedelta(days=10)).isoformat(),
+    })
+    assert response.status_code == 409, response.text
+    assert state(factory) == after_closure
+    assert client.put(path, json={"deadline": None}).status_code == 400
+    assert state(factory) == after_closure
+
+
 @pytest.mark.parametrize("level,days", [("MAJOR", -1), ("MAJOR", 0), ("MAJOR", 15),
                                         ("MAJOR", 60), ("GENERAL", -1), ("GENERAL", 0),
                                         ("GENERAL", 31), ("GENERAL", 60)])

@@ -131,11 +131,22 @@ def update_hazard(
     # 先算有效期限，再改模型；无关更新不批量修正旧记录。
     if "deadline" in changes or level != h.level:
         changes["deadline"] = deadline_for(level, h.reported_at, changes.get("deadline", h.deadline))
-    for field, value in changes.items():
-        setattr(h, field, value)
     if payload.assignee and h.status == HazardStatus.PENDING:
-        h.status = HazardStatus.IN_PROGRESS
-    db.commit()
+        changes["status"] = HazardStatus.IN_PROGRESS
+    if changes:
+        # 将校验时的状态作为原子写入条件，避免竞争请求拼出违规等级/期限。
+        affected = db.query(Hazard).filter(
+            Hazard.id == h.id,
+            Hazard.level == h.level,
+            Hazard.reported_at == h.reported_at,
+            Hazard.deadline == h.deadline,
+            Hazard.status == h.status,
+            Hazard.updated_at == h.updated_at,
+        ).update(changes, synchronize_session=False)
+        if affected != 1:
+            db.rollback()
+            raise HTTPException(409, "隐患已被其他请求修改，请刷新后重试")
+        db.commit()
     db.refresh(h)
     return api_response(message="已更新", data=HazardResponse.model_validate(h).model_dump())
 
