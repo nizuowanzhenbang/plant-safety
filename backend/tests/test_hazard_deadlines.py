@@ -370,15 +370,13 @@ def test_integration_default_uses_single_clock_anchor(api, monkeypatch):
         assert row.deadline == row.reported_at + timedelta(days=14)
 
 
-def test_duplicate_integration_preserves_original_deadline(api):
+def test_conflicting_integration_replay_preserves_original_deadline(api):
     client, factory, _ = api
     first = receive(client)
     assert first.status_code == 200, first.text
     before = state(factory)
     response = receive(client, severity="MINOR", reported_at=(NOW + timedelta(days=60)).isoformat())
-    assert response.status_code == 200, response.text
-    assert response.json()["data"]["duplicated"] is True
-    assert response.json()["data"]["id"] == first.json()["data"]["id"]
+    assert response.status_code == 409, response.text
     assert state(factory) == before
 
 
