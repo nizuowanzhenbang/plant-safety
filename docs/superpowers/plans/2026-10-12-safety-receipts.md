@@ -35,3 +35,13 @@ Files: tests/postgresql/test_integration_receipts.py、.github/workflows/quality
 ## 执行台账
 
 基线 e5e62e77ea0d01c7c24bea790d79e51a3b3f18d1，完整 68 passed。工作分支 upgrade/safety-integration-20261012。用户已有自主执行授权，方案/检查点可随阶段核对；无重复许可等待。Pre-flight: 发送端 ACK 消费来源/单号/id/hazard_no，接收端必须同时提供；发送端消息不可变，接收端对原消息重放不重置人工处置。
+
+## 接收实现阶段
+
+实际42项新双数据库回归先40 failed/2 passed；附加事务写入失败/丢失映射和既有冲突不延长期限先4 failed/1 intentional skip。复现 a3c34386576dadc96ecf3aafd4f1de4c2e26ac00 已推送。实现后完整113 passed/1 skipped，跳过仅 PostgreSQL FK 已阻止的孤立映射人工损坏场景；SQLite 实际覆盖该拒绝。原有68项仍覆盖，新冲突请求明确409并保持原期限。
+
+新表由 main 在 create_all 前注册，与隐患同事务；自然键唯一/hash/原请求保存；旧映射按可核对的标题描述/区域/类别/等级/人员/来源/显式发现时间核对；没有可验证的原 location/sla 字段不能反推，首次接续收据保存此次规范消息。人工修改新收据对应隐患后重放不回写处置。
+
+Ruling: 历史无原消息的映射只核对已存投影，重复/不一致返回409 — 无法从旧 Hazard 重建全部原字段 — 未存的原字段无法证明，同步冲突需要人工核对，绝不任意取第一条或清洗历史。
+
+反查新增 query 参数形式保留旧路径；支持 Unicode/含斜线的机器单号而不任意收窄旧输入范围。加入真实 PostgreSQL CI。ruff/前端构建通过；真正两应用协议验收和整批审查/发布仍待。
