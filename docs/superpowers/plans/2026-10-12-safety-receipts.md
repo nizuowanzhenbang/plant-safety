@@ -30,7 +30,7 @@ Interfaces: normalized_payload(body)->dict；receive_hazard 固定自然键 ACK�
 Files: tests/postgresql/test_integration_receipts.py、.github/workflows/quality.yml；设备端 tests/test_safety_delivery.py 运行两个独立服务。
 - [x] 实际 SQLite/PostgreSQL 同/异键竞争、编号碰撞及故障注入 RED；加入 PostgreSQL CI。
 - [x] 完整 backend/前端构建，设备端真实 HTTP 正常/断线/重启/内容变更对接通过，推送。
-- [ ] 随整批一次 fresh-context 审查；重要修复 RED→GREEN 后候选 CI/合并/main CI；发布真实 SHA 与中央签收。
+- [x] 随整批一次 fresh-context 审查；重要修复 RED→GREEN 后候选 CI/合并/main CI；发布真实 SHA 与中央签收。
 
 ## 执行台账
 
@@ -55,3 +55,8 @@ Ruling: 历史无原消息的映射只核对已存投影，重复/不一致返�
 
 
 单次修正后最终完整后端119 passed/1 intentional skip（PG外键已阻止的人工损坏孤立映射）；ruff通过。新增双库旧表升级、重复启动、9000高号接续、已提交号码删除不复用均通过。第一次附加升级测试编辑因backend工作目录又带backend前缀而未写入，纠正路径后实际执行通过，不计业务失败。候选CI与集成仍待。
+
+
+## 发布签收
+
+固定修正候选6ff90cac638d88b7109dba5bfaf4cefad95ffc05的backend/frontend/postgresql通过；PR #4合并为6f12503f00fdd485a55e737f17d08e8ff8b833f0，[main CI](https://github.com/nizuowanzhenbang/plant-safety/actions/runs/38628086080)三项成功。合并树与受测候选一致。修正后真正两应用配对2通过；中央证据在smart-power-plant/progress/evidence/2026-10-14-procurement-safety.md（发布前审查记录a937aab）。实际merged检查点/释放使用进度CLI保存，设备随后发布。三项Minor仍延期，未声称现场/性能或跨库exactly-once。
