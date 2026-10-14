@@ -9,6 +9,7 @@ from app.config import settings
 from app.database import engine, SessionLocal, Base
 from app.models.user import User, UserRole
 from app.models.hazard import Hazard
+from app.models.integration_receipt import IntegrationReceipt
 from app.models.ticket import WorkTicket, OperationTicket
 from app.models.safety_check import SafetyCheckPlan, SafetyCheckRecord
 from app.api import (
@@ -18,7 +19,7 @@ from app.api import (
 from app.api.deps import hash_password
 
 # 确保所有模型在建表前已被导入
-_ = (User, Hazard, WorkTicket, OperationTicket, SafetyCheckPlan, SafetyCheckRecord)
+_ = (User, Hazard, WorkTicket, OperationTicket, SafetyCheckPlan, SafetyCheckRecord, IntegrationReceipt)
 
 
 def _create_default_admin(db) -> None:

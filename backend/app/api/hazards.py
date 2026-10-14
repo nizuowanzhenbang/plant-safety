@@ -23,7 +23,8 @@ from app.schemas.hazard import (
     HazardVerify,
     HazardResponse,
 )
-from app.utils.helpers import api_response, paginate_response, generate_hazard_code
+from app.utils.helpers import api_response, paginate_response
+from app.utils.hazard_numbers import allocate_hazard_number
 from app.utils.hazard_deadlines import deadline_for
 
 router = APIRouter(prefix="/api/hazards", tags=["隐患排查"])
@@ -74,9 +75,8 @@ def create_hazard(
 ):
     reported_at = datetime.utcnow()
     deadline = deadline_for(payload.level, reported_at, payload.deadline)
-    next_seq = (db.query(func.count(Hazard.id)).scalar() or 0) + 1
     hazard = Hazard(
-        hazard_code=generate_hazard_code(next_seq),
+        hazard_code=allocate_hazard_number(db, reported_at),
         title=payload.title,
         description=payload.description,
         area=payload.area,
