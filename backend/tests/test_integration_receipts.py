@@ -264,3 +264,46 @@ def test_replay_with_missing_hazard_reference_is_conflict(receiver_ctx):
     response = receive(ctx)
     assert response.status_code == 409, response.text
     assert state(ctx) == before
+
+
+@pytest.mark.parametrize('origin', ['manual', 'safety-check'])
+def test_rolled_back_identity_then_receives_keep_other_creation_paths_working(receiver_ctx, origin):
+    from app.api import hazards, safety_checks
+    from app.api.deps import create_access_token
+    from app.models.user import User, UserRole
+    from tests.test_check_hazard_ownership import started_record, submit, convert
+    ctx = receiver_ctx
+    ctx.app.include_router(hazards.router)
+    ctx.app.include_router(safety_checks.router)
+    with ctx.factory() as db:
+        for role in (UserRole.SAFETY_OFFICER, UserRole.OPERATOR):
+            db.add(User(username=role.value, role=role, hashed_password='unused', is_active=True))
+        db.commit()
+    headers = {role.value: {'Authorization': 'Bearer '+create_access_token(role.value)}
+               for role in (UserRole.SAFETY_OFFICER, UserRole.OPERATOR)}
+    ctx.client.headers.update(headers['OPERATOR'])
+    assert receive(ctx).status_code == 200
+    # PostgreSQL INSERT 回滚消耗序列值，真实编号竞争也会产生相同 ID 空洞。
+    with ctx.factory() as db:
+        original = db.query(Hazard).first()
+        values = {column.name: getattr(original, column.name) for column in Hazard.__table__.columns
+                  if column.name != 'id'}
+        values.update(hazard_code='ROLLED-BACK', external_no='ROLLED-BACK')
+        db.add(Hazard(**values))
+        db.flush()
+        db.rollback()
+    assert receive(ctx, external_no='SECOND').status_code == 200
+    assert receive(ctx, external_no='THIRD').status_code == 200
+    if origin == 'manual':
+        response = ctx.client.post('/api/hazards', json={
+            'title': '正常人工登记', 'description': '编号竞争后应仍可登记', 'area': 'MAIN_PLANT',
+            'category': 'MECHANICAL', 'level': 'GENERAL', 'reporter': '测试人员'})
+    else:
+        api = (ctx.client, ctx.factory, headers)
+        record_id = started_record(api)
+        assert submit(ctx.client, record_id).status_code == 200
+        response = convert(ctx.client, record_id)
+    assert response.status_code == 200, response.text
+    with ctx.factory() as db:
+        codes = [h.hazard_code for h in db.query(Hazard)]
+        assert len(codes) == len(set(codes)) == 4
