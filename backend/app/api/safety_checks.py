@@ -22,8 +22,9 @@ from app.schemas.safety_check import (
     ConvertHazardRequest, SafetyCheckRecordResponse,
 )
 from app.utils.helpers import (
-    api_response, paginate_response, generate_safety_check_code, generate_hazard_code,
+    api_response, paginate_response, generate_safety_check_code,
 )
+from app.utils.hazard_numbers import allocate_hazard_number
 from app.utils.hazard_deadlines import deadline_for, max_deadline_days
 
 router = APIRouter(prefix="/api/safety-checks", tags=["安全检查"])
@@ -309,7 +310,6 @@ def convert_to_hazard(
     reported_at = datetime.utcnow()
     deadline = deadline_for(payload.level, reported_at, reported_at + timedelta(days=deadline_days))
 
-    seq = (db.query(func.count(Hazard.id)).scalar() or 0) + 1
     title = f"[安全检查] {target.get('content', '')[:160]}"
     description_parts = [
         f"来源：安全检查记录 {r.record_code} 第 {payload.seq} 项",
@@ -321,7 +321,7 @@ def convert_to_hazard(
         description_parts.append(f"现场说明：{target['notes']}")
 
     h = Hazard(
-        hazard_code=generate_hazard_code(seq),
+        hazard_code=allocate_hazard_number(db, reported_at),
         title=title[:200],
         description="\n".join(description_parts),
         area=area_enum,

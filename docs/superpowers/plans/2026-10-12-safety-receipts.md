@@ -22,14 +22,14 @@
 
 Files: backend/app/models/integration_receipt.py、api/integration.py、main.py；tests/test_integration_receipts.py。
 Interfaces: normalized_payload(body)->dict；receive_hazard 固定自然键 ACK；lookup 返回相同身份。
-- [ ] 实际 HTTP 输入/相同内容/冲突/旧映射/人工处置/坏键/事务失败回归，先确认 RED。
-- [ ] 实现收据与冲突拒绝、新表注册/启动，完整原有 68 项与新回归通过；提交候选。
+- [x] 实际 HTTP 输入/相同内容/冲突/旧映射/人工处置/坏键/事务失败回归，先确认 RED。
+- [x] 实现收据与冲突拒绝、新表注册/启动，完整原有 68 项与新回归通过；提交候选。
 
 ### Task 2 · 两数据库与跨系统故障证据
 
 Files: tests/postgresql/test_integration_receipts.py、.github/workflows/quality.yml；设备端 tests/test_safety_delivery.py 运行两个独立服务。
-- [ ] 实际 SQLite/PostgreSQL 同/异键竞争、编号碰撞及故障注入 RED；加入 PostgreSQL CI。
-- [ ] 完整 backend/前端构建，设备端真实 HTTP 正常/断线/重启/内容变更对接通过，推送。
+- [x] 实际 SQLite/PostgreSQL 同/异键竞争、编号碰撞及故障注入 RED；加入 PostgreSQL CI。
+- [x] 完整 backend/前端构建，设备端真实 HTTP 正常/断线/重启/内容变更对接通过，推送。
 - [ ] 随整批一次 fresh-context 审查；重要修复 RED→GREEN 后候选 CI/合并/main CI；发布真实 SHA 与中央签收。
 
 ## 执行台账
@@ -45,3 +45,13 @@ Files: tests/postgresql/test_integration_receipts.py、.github/workflows/quality
 Ruling: 历史无原消息的映射只核对已存投影，重复/不一致返回409 — 无法从旧 Hazard 重建全部原字段 — 未存的原字段无法证明，同步冲突需要人工核对，绝不任意取第一条或清洗历史。
 
 反查新增 query 参数形式保留旧路径；支持 Unicode/含斜线的机器单号而不任意收窄旧输入范围。加入真实 PostgreSQL CI。ruff/前端构建通过；真正两应用协议验收和整批审查/发布仍待。
+
+
+## 整批审查 Important 修正轮 · 2026-10-14
+
+唯一一次fresh-context审查发现编号与人工/检查count规则不兼容：PG回滚序列空洞后两入口500。新HTTP回归先2 failed/2 passed，失败提交9752f18。接受Important R1，三个入口统一独立 hazard_number_sequences 日序号与原隐患事务；启动只增新表，不改旧列/历史记录，按当前日最大合法后缀接续，已提交号码删除后不复用。代价：新增小表、同日编号串行；需维护窗口统一切换进程，旧count写入进程不得混用。旧库增表/重复启动/9000高号/删除不复用另有双库回归。
+
+整批其它Important R2/R3在设备计划完整记录，单次修复后不再启动整批审查。三项Minor明确延期：接收备份维护窗口具体操作说明、采购显式余量、日常界面显示已存跳过/失败原因。边界与成本见设备计划和中央证据。审查者Declined现场/性能/第三方/任意篡改恢复/跨库exactly-once，接受其范围边界，不声称这些已验收。
+
+
+单次修正后最终完整后端119 passed/1 intentional skip（PG外键已阻止的人工损坏孤立映射）；ruff通过。新增双库旧表升级、重复启动、9000高号接续、已提交号码删除不复用均通过。第一次附加升级测试编辑因backend工作目录又带backend前缀而未写入，纠正路径后实际执行通过，不计业务失败。候选CI与集成仍待。

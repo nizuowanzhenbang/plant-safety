@@ -307,3 +307,37 @@ def test_rolled_back_identity_then_receives_keep_other_creation_paths_working(re
     with ctx.factory() as db:
         codes = [h.hazard_code for h in db.query(Hazard)]
         assert len(codes) == len(set(codes)) == 4
+
+
+
+def test_startup_adds_number_state_preserves_legacy_data_and_does_not_reuse_deletions(receiver_ctx):
+    from app.models.integration_receipt import IntegrationReceipt
+    ctx = receiver_ctx
+    assert receive(ctx).status_code == 200
+    with ctx.factory() as db:
+        old = db.query(Hazard).first()
+        prefix = old.hazard_code.rsplit('-', 1)[0]+'-'
+        values = {column.name: getattr(old, column.name) for column in Hazard.__table__.columns
+                  if column.name != 'id'}
+        values.update(hazard_code=prefix+'9000', external_no='LEGACY-9000')
+        db.add(Hazard(**values))
+        db.commit()
+    Base.metadata.tables['integration_receipts'].drop(ctx.engine)
+    Base.metadata.tables['hazard_number_sequences'].drop(ctx.engine)
+    with ctx.engine.connect() as conn:
+        before = [tuple(row) for row in conn.execute(select(Hazard.__table__).order_by(Hazard.id))]
+    Base.metadata.create_all(ctx.engine)
+    Base.metadata.create_all(ctx.engine)
+    with ctx.engine.connect() as conn:
+        assert [tuple(row) for row in conn.execute(select(Hazard.__table__).order_by(Hazard.id))] == before
+    first = receive(ctx, external_no='NEW-9001')
+    assert first.status_code == 200, first.text
+    assert first.json()['data']['hazard_no'] == prefix+'9001'
+    did = first.json()['data']['id']
+    with ctx.factory() as db:
+        db.query(IntegrationReceipt).filter_by(hazard_id=did).delete()
+        db.delete(db.get(Hazard, did))
+        db.commit()
+    second = receive(ctx, external_no='NEW-9002')
+    assert second.status_code == 200, second.text
+    assert second.json()['data']['hazard_no'] == prefix+'9002'

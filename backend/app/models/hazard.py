@@ -6,6 +6,14 @@ from sqlalchemy.orm import relationship
 from app.database import Base
 
 
+class HazardNumberSequence(Base):
+    """三个隐患入口共用的事务内日序号；不依赖主键空洞或当前条数。"""
+    __tablename__ = 'hazard_number_sequences'
+
+    day = Column(String(8), primary_key=True)
+    last_value = Column(Integer, nullable=False)
+
+
 class HazardArea(str, enum.Enum):
     """隐患发生区域（发电厂分区）"""
     MAIN_PLANT = "MAIN_PLANT"             # 主厂房

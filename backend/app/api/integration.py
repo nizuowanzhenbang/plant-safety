@@ -6,7 +6,6 @@ import json
 from math import isfinite
 
 from fastapi import APIRouter, Header, HTTPException
-from sqlalchemy import func
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -17,7 +16,8 @@ from app.config import settings
 from app.models.hazard import (
     Hazard, HazardArea, HazardCategory, HazardLevel, HazardStatus,
 )
-from app.utils.helpers import api_response, generate_hazard_code
+from app.utils.helpers import api_response
+from app.utils.hazard_numbers import allocate_hazard_number
 from app.utils.hazard_deadlines import deadline_for, normalize_utc
 from fastapi import Depends
 
@@ -142,15 +142,6 @@ def _legacy_matches(hazard, payload):
     return all(getattr(hazard, field) == value for field, value in expected.items())
 
 
-def _next_code(db, clock):
-    prefix = f'YH-{clock:%Y%m%d}-'
-    codes = db.query(Hazard.hazard_code).filter(Hazard.hazard_code.like(prefix+'%')).all()
-    suffix = max((int(code[len(prefix):]) for (code,) in codes
-                  if code[len(prefix):].isascii() and code[len(prefix):].isdigit()), default=0)
-    sequence = max(suffix, db.query(func.max(Hazard.id)).scalar() or 0)+1
-    return f'{prefix}{sequence:04d}'
-
-
 @router.post('/hazards')
 def receive_hazard(payload: IncomingHazard, db: Session = Depends(get_db),
                    x_integration_secret: Optional[str] = Header(None, alias='X-Integration-Secret')):
@@ -180,7 +171,7 @@ def receive_hazard(payload: IncomingHazard, db: Session = Depends(get_db),
                 reported = normalize_utc(payload.reported_at or clock)
                 level = _map_level(payload.severity)
                 deadline = deadline_for(level, reported)
-                hazard = Hazard(hazard_code=_next_code(db, clock), title=f'[联动] {payload.title}'[:200],
+                hazard = Hazard(hazard_code=allocate_hazard_number(db, clock), title=f'[联动] {payload.title}'[:200],
                                 description=_description(payload), area=_map_area(payload.equipment_code),
                                 category=HazardCategory.MECHANICAL, level=level,
                                 reporter=payload.reported_by or 'external-integration', department=source,
