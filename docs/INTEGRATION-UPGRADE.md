@@ -48,8 +48,8 @@ PostgreSQL 使用与服务端兼容的客户端和预配置 libpq 服务（`PGSE
 
 ```bash
 # PGSERVICE 指向已核对的安全源库；SAFETY_BACKUP_FILE 是不存在的新文件
-( set -o noclobber; pg_dump --format=custom > "$SAFETY_BACKUP_FILE" )
-pg_restore --list "$SAFETY_BACKUP_FILE"
+( set -o noclobber; pg_dump --format=custom > "$SAFETY_BACKUP_FILE" ) &&
+pg_restore --list "$SAFETY_BACKUP_FILE" &&
 sha256sum "$SAFETY_BACKUP_FILE"
 ```
 
