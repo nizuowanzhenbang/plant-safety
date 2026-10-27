@@ -24,3 +24,7 @@ GitHub Actions 对 PR、主分支提交及手动触发执行相同检查。前�
 - 测试通过只代表覆盖的用例通过，不等于性能、并发、现场规程或生产安全验收。
 - 使用个人构造的设备、人员和业务数据；真实部署另行配置密钥、账户、数据库备份及访问控制。
 - 项目组合与讲解路线：[smart-power-plant](https://github.com/nizuowanzhenbang/smart-power-plant)。
+
+## 联动接收版本升级
+
+[备份、维护窗口、全部写入进程统一切换与恢复](INTEGRATION-UPGRADE.md)。包括原子收据和日序号新表、隔离恢复检查，以及已 ACK 后回退必须跨系统对账的边界。
